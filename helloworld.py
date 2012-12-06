@@ -16,13 +16,16 @@
 
 """Google Compute Engine demo using the Google Python Client Library.
 
-This demo:
-Starts an instance with a start up script and metadata. The startup script:
-- Installs Image Magick on the machine.
-- Downloads the image at the URL provided in the metadata.
-- Adds the text provided in the metadata to the image.
-- Copies the edited image to Cloud Storage.
-- Shuts down the instance.
+Demo steps:
+
+- Create an instance with a start up script and metadata. 
+- Print out the URL where the modified image will be written.
+- The start up script executes these steps on the instance:
+    - Installs Image Magick on the machine.
+    - Downloads the image from the URL provided in the metadata.
+    - Adds the text provided in the metadata to the image.
+    - Copies the edited image to Cloud Storage.
+- After recieving input from the user, shut down the instance.
 
 To run this demo:
 - Edit the client id and secret in the client_secrets.json file.
