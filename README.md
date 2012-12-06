@@ -2,15 +2,16 @@
 
 Google Compute Engine features a RESTful API that allows developers to run virtual machines in the cloud. This sample python command-line application demonstrates how to access the Compute Engine API using the Google Python API Client Library. For more information about the library, read the [Getting Started: Google Python Client Library documentation][1].
 
-This demo:
+Demo steps:
 
-- Starts an instance with a start up script and metadata. 
-- Waits for the startup script, it does the following:
+- Create an instance with a start up script and metadata. 
+- Print out the URL where the modified image will be written.
+- The start up script executes these steps on the instance:
     - Installs Image Magick on the machine.
-    - Downloads the image at the URL provided in the metadata.
+    - Downloads the image from the URL provided in the metadata.
     - Adds the text provided in the metadata to the image.
     - Copies the edited image to Cloud Storage.
-- Shuts down the instance.
+- After recieving input from the user, shut down the instance.
 
 ## Products
 - [Google Compute Engine][2]
