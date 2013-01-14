@@ -67,6 +67,7 @@ def main():
   gce_helper = gce.Gce(auth_http, PROJECT_ID)
 
   # Start an image with a local start-up script.
+  print 'Starting up an instance:'
   instance_name = 'startup-script-demo'
   try:
     gce_helper.start_instance(
@@ -85,6 +86,7 @@ def main():
     print e
     return
 
+  print 'Here are your running instances:'
   instances = gce_helper.list_instances()
   for instance in instances:
     print instance['name']

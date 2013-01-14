@@ -31,15 +31,15 @@ from apiclient.errors import HttpError
 from httplib2 import HttpLib2Error
 from oauth2client.client import AccessTokenRefreshError
 
-API_VERSION = 'v1beta12'
+API_VERSION = 'v1beta13'
 GCE_URL = 'https://www.googleapis.com/compute/%s/projects/' % (API_VERSION)
 
 DEFAULT_ZONE = 'us-central1-a'
 DEFAULT_MACHINE_TYPE = 'n1-standard-1'
 DEFAULT_DISK = 'EPHEMERAL'
-DEFAULT_IMAGE = 'ubuntu'
+DEFAULT_IMAGE = 'gcel'
 DEFAULT_IMAGES = {
-    'ubuntu': 'ubuntu-12-04-v20120621',
+    'gcel': 'gcel-12-04-v20121106',
     'centos': 'centos-6-2-v20120621'
 }
 DEFAULT_SERVICE_EMAIL = 'default'
@@ -104,7 +104,7 @@ class Gce(object):
 
     instance = {
         'name': instance_name,
-        'machineType': '%s/machine-types/%s' % (
+        'machineType': '%s/machineTypes/%s' % (
             self.project_url, machine_type),
         'image': image_url,
         'zone': '%s/zones/%s' % (self.project_url, zone),
