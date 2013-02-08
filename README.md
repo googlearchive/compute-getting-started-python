@@ -4,11 +4,15 @@ Google Compute Engine features a RESTful API that allows developers to run virtu
 
 To run the demo:
 
-- Update the client_secrets.json file with your client id and secret found in the [Google APIs Console][2].
-- Update the global variables at the top of the helloworld.py file with your project information.
+- Update the variables in the settings.py file.
+    - GCE_PROJECT_ID: your Compute Engine [project ID][2].
+    - IMAGE_URL: the string URL of an image (for example, http://lh6.ggpht.com/-TqOY_FXI6cE/SbGZ0Nb0UtI/AAAAAAAADG4/m_Kr5y-IPpM/s640/android-wallpaper5_2560x1600.jpg)
+    - IMAGE_TEXT: some text to display over the image.
+    - GCS_BUCKET: your bucket on Google Cloud Storage.
+- Update the client_secrets.json file with your client id and secret found in the [Google APIs Console][3].
 - Run the sample using the command:
 
-python helloworld.py
+python main.py
 
 Demo steps:
 
@@ -22,18 +26,19 @@ Demo steps:
 - After recieving input from the user, shut down the instance.
 
 ## Products
-- [Google Compute Engine][3]
-- [Google Cloud Storage][4]
+- [Google Compute Engine][4]
+- [Google Cloud Storage][5]
 
 ## Language
-- [Python][5]
+- [Python][6]
 
 ## Dependencies
-- [Google APIs Client Library for Python][6]
+- [Google APIs Client Library for Python][7]
 
 [1]: https://developers.google.com/compute/docs/api/python_guide
-[2]: https://code.google.com/apis/console
-[3]: https://developers.google.com/compute
-[4]: https://developers.google.com/storage
-[5]: https://python.org
-[6]: http://code.google.com/p/google-api-python-client/
+[2]: https://developers.google.com/compute/docs/overview#concepts
+[3]: https://code.google.com/apis/console
+[4]: https://developers.google.com/compute
+[5]: https://developers.google.com/storage
+[6]: https://python.org
+[7]: http://code.google.com/p/google-api-python-client/

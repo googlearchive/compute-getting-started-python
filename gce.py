@@ -31,21 +31,11 @@ from apiclient.errors import HttpError
 from httplib2 import HttpLib2Error
 from oauth2client.client import AccessTokenRefreshError
 
-API_VERSION = 'v1beta13'
-GCE_URL = 'https://www.googleapis.com/compute/%s/projects/' % (API_VERSION)
+import settings
 
-DEFAULT_ZONE = 'us-central1-a'
-DEFAULT_MACHINE_TYPE = 'n1-standard-1'
-DEFAULT_DISK = 'EPHEMERAL'
-DEFAULT_IMAGE = 'gcel'
-DEFAULT_IMAGES = {
-    'gcel': 'gcel-12-04-v20121106',
-    'centos': 'centos-6-2-v20120621'
-}
-DEFAULT_SERVICE_EMAIL = 'default'
-DEFAULT_NETWORK = 'default'
-DEFAULT_SCOPES = ['https://www.googleapis.com/auth/devstorage.full_control',
-                  'https://www.googleapis.com/auth/compute']
+GCE_URL = 'https://www.googleapis.com/compute/%s/projects/' % (
+    settings.API_VERSION)
+GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
 
 
 class Gce(object):
@@ -58,34 +48,42 @@ class Gce(object):
       auth_http: an authorized instance of Http
       project_id: the API console project name
     """
-    self.service = build('compute', API_VERSION)
-    self.auth_http = auth_http
+    self.service = build('compute', settings.API_VERSION, http=auth_http)
     self.project_id = project_id
-    self.project_url = '%s%s' % (GCE_URL, self.project_id)
+    self.project_url = GCE_URL + self.project_id
 
-  def start_instance(self, instance_name, zone=DEFAULT_ZONE,
-                     machine_type=DEFAULT_MACHINE_TYPE, disk=DEFAULT_DISK,
-                     image=DEFAULT_IMAGE, service_email=DEFAULT_SERVICE_EMAIL,
-                     scopes=None, metadata=None, startup_script=None,
-                     startup_script_url=None, network=DEFAULT_NETWORK,
+  def start_instance(self,
+                     instance_name,
+                     zone=settings.DEFAULT_ZONE,
+                     machine_type=settings.DEFAULT_MACHINE_TYPE,
+                     disk=settings.DEFAULT_DISK,
+                     image=settings.DEFAULT_IMAGE,
+                     service_email=settings.DEFAULT_SERVICE_EMAIL,
+                     network=settings.DEFAULT_NETWORK,
+                     scopes=None,
+                     metadata=None,
+                     startup_script=None,
+                     startup_script_url=None,
                      blocking=True):
     """Start instance with the given name and settings.
 
     Args:
-      instance_name: string name for instance.
-      zone: the string zone name.
-      machine_type: the string machine type.
-      disk: the string disk.
-      image: the string image name.
-      service_email: the string service email.
-      scopes: list of string scopes.
-      metadata: list of metadata objects.
-      startup_script: the filename of a startup script.
-      startup_script_url: url of a startup script.
-      network: the network.
-      blocking: whether the function will wait for the operation to complete.
+      instance_name: String name for instance.
+      zone: The string zone name.
+      machine_type: The string machine type.
+      disk: The string disk.
+      image: The string image name.
+      service_email: The string service email.
+      network: The string network.
+      scopes: List of string scopes.
+      metadata: List of metadata objects.
+      startup_script: The filename of a startup script.
+      startup_script_url: Url of a startup script.
+      blocking: Whether the function will wait for the operation to complete.
+
     Returns:
       Dictionary response representing the operation.
+
     Raises:
       ApiOperationError: Operation contains an error message.
     """
@@ -94,20 +92,17 @@ class Gce(object):
       return
 
     image_url = None
-    if image in DEFAULT_IMAGES:
-      image_url = '%s%s/images/%s' % (
-          GCE_URL, 'google', DEFAULT_IMAGES[image])
+    if image == settings.DEFAULT_IMAGE:
+      image_url = '%sgoogle/global/images/%s' % (GCE_URL, image)
     else:
-      image_url = '%s/images/%s' % (self.project_url, image)
-
-    if not scopes: scopes = DEFAULT_SCOPES
+      image_url = '%s/global/images/%s' % (self.project_url, image)
+    if not scopes: scopes = settings.DEFAULT_SCOPES
 
     instance = {
         'name': instance_name,
-        'machineType': '%s/machineTypes/%s' % (
+        'machineType': '%s/global/machineTypes/%s' % (
             self.project_url, machine_type),
         'image': image_url,
-        'zone': '%s/zones/%s' % (self.project_url, zone),
         'disks': [{
             'type': disk
         }],
@@ -116,7 +111,7 @@ class Gce(object):
                 'type': 'ONE_TO_ONE_NAT',
                 'name': 'External NAT'
             }],
-            'network': '%s/networks/%s' % (self.project_url, network)
+            'network': '%s/global/networks/%s' % (self.project_url, network)
         }],
         'serviceAccounts': [{
             'email': service_email,
@@ -145,44 +140,52 @@ class Gce(object):
       instance['metadata']['items'].append(startup_script_url_resource)
 
     request = self.service.instances().insert(
-        project=self.project_id, body=instance)
+        project=self.project_id, zone=zone, body=instance)
     response = self._execute_request(request)
     if response and blocking:
       response = self._blocking_call(response)
 
-    if 'error' in response:
+    if response and 'error' in response:
       raise ApiOperationError(response['error']['errors'])
 
     return response
 
-  def list_instances(self, list_filter=None):
+  def list_instances(self, zone=settings.DEFAULT_ZONE, list_filter=None):
     """Lists project instances.
 
     Args:
-      list_filter: string filter for list query.
+      zone: The string zone name.
+      list_filter: String filter for list query.
+
     Returns:
       List of instances matching given filter.
     """
     request = None
     if list_filter:
       request = self.service.instances().list(
-          project=self.project_id, filter=list_filter)
+          project=self.project_id, zone=zone, filter=list_filter)
     else:
       request = self.service.instances().list(
-          project=self.project_id)
+          project=self.project_id, zone=zone)
     response = self._execute_request(request)
     if response and 'items' in response:
       return response['items']
     return []
 
-  def stop_instance(self, instance_name, blocking=True):
+  def stop_instance(self,
+                    instance_name,
+                    zone=settings.DEFAULT_ZONE,
+                    blocking=True):
     """Stops instances.
 
     Args:
-      instance_name: string name for the instance.
-      blocking: whether the function will wait for the operation to complete.
+      instance_name: String name for the instance.
+      zone: The string zone name.
+      blocking: Whether the function will wait for the operation to complete.
+
     Returns:
       Dictionary response representing the operation.
+
     Raises:
       ApiOperationError: Operation contains an error message.
     """
@@ -191,12 +194,12 @@ class Gce(object):
       return
 
     request = self.service.instances().delete(
-        project=self.project_id, instance=instance_name)
+        project=self.project_id, zone=zone, instance=instance_name)
     response = self._execute_request(request)
     if response and blocking:
       response = self._blocking_call(response)
 
-    if 'error' in response:
+    if response and 'error' in response:
       raise ApiOperationError(response['error']['errors'])
 
     return response
@@ -212,8 +215,13 @@ class Gce(object):
     status = response['status']
     while status != 'DONE' and response:
       operation_id = response['name']
-      request = self.service.operations().get(
-          project=self.project_id, operation=operation_id)
+      if 'zone' in response:
+        zone = response['zone'].rsplit('/', 1)[-1]
+        request = self.service.zoneOperations().get(
+            project=self.project_id, zone=zone, operation=operation_id)
+      else:
+        request = self.service.globalOperations().get(
+            project=self.project_id, operation=operation_id)
       response = self._execute_request(request)
       if response:
         status = response['status']
@@ -224,11 +232,12 @@ class Gce(object):
 
     Args:
       request: the API request to execute.
+
     Returns:
       Dictionary response representing the operation if successful.
     """
     try:
-      response = request.execute(self.auth_http)
+      response = request.execute()
     except AccessTokenRefreshError:
       print 'Access token is invalid.'
       traceback.print_exc()

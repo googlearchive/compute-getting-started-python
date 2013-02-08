@@ -38,27 +38,26 @@ http://cloud.google.com/products/cloud-storage.html
 
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
+import logging
+
 import httplib2
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.file import Storage
 from oauth2client.tools import run
 
 import gce
+import settings
 
-CLIENT_SECRETS = 'client_secrets.json'
 OAUTH2_STORAGE = 'oauth2.dat'
-GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
-
-PROJECT_ID = '<your_project_id>'
-IMAGE_URL = '<image_url>'
-CS_BUCKET = '<your_cloud_storage_bucket>'
 
 
 def main():
   """Perform OAuth 2 authorization, then start, list, and stop instance(s)."""
 
+  logging.basicConfig()
+
   # Perform OAuth 2.0 authorization.
-  flow = flow_from_clientsecrets(CLIENT_SECRETS, scope=GCE_SCOPE)
+  flow = flow_from_clientsecrets(settings.CLIENT_SECRETS, scope=gce.GCE_SCOPE)
   storage = Storage(OAUTH2_STORAGE)
   credentials = storage.get()
 
@@ -67,39 +66,41 @@ def main():
   http = httplib2.Http()
   auth_http = credentials.authorize(http)
 
-  gce_helper = gce.Gce(auth_http, PROJECT_ID)
+  gce_helper = gce.Gce(auth_http, settings.GCE_PROJECT_ID)
 
   # Start an image with a local start-up script.
-  print 'Starting up an instance:'
+  print 'Starting up an instance'
   instance_name = 'startup-script-demo'
   try:
     gce_helper.start_instance(
         instance_name, startup_script='startup.sh', metadata=[{
             'key': 'url',
-            'value': IMAGE_URL
+            'value': settings.IMAGE_URL
         }, {
             'key': 'text',
-            'value': 'AWESOME'
+            'value': settings.IMAGE_TEXT
         }, {
             'key': 'cs-bucket',
-            'value': CS_BUCKET
+            'value': settings.GCS_BUCKET
         }])
   except gce.ApiOperationError as e:
     print 'Error starting instance'
     print e
     return
 
+  # List all running instances.
   print 'Here are your running instances:'
   instances = gce_helper.list_instances()
   for instance in instances:
     print instance['name']
 
-  print 'Visit http://commondatastorage.googleapis.com/%s/output.png' % (
-      CS_BUCKET)
+  print 'Visit http://storage.googleapis.com/%s/output.png' % (
+      settings.GCS_BUCKET)
   print 'It might take a minute for the output.png file to show up.'
   raw_input('Hit Enter when done to shutdown instance')
 
   # Stop the instance.
+  print 'Shutting down the instance'
   try:
     gce_helper.stop_instance(instance_name)
   except gce.ApiOperationError as e:
