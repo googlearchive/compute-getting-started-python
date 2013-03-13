@@ -39,6 +39,10 @@ http://cloud.google.com/products/cloud-storage.html
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
 import logging
+try:
+  import simplejson as json
+except:
+  import json
 
 import httplib2
 from oauth2client.client import flow_from_clientsecrets
@@ -46,68 +50,78 @@ from oauth2client.file import Storage
 from oauth2client.tools import run
 
 import gce
-import settings
-
-OAUTH2_STORAGE = 'oauth2.dat'
 
 
 def main():
   """Perform OAuth 2 authorization, then start, list, and stop instance(s)."""
 
-  logging.basicConfig()
+  logging.basicConfig(level=logging.INFO)
 
-  # Perform OAuth 2.0 authorization.
-  flow = flow_from_clientsecrets(settings.CLIENT_SECRETS, scope=gce.GCE_SCOPE)
-  storage = Storage(OAUTH2_STORAGE)
+  # Load GCE settings.
+  settings = json.loads(open(gce.SETTINGS_FILE, 'r').read())
+
+  # Perform OAuth 2.0 authorization flow.
+  flow = flow_from_clientsecrets(
+      settings['client_secrets'], scope=settings['compute_scope'])
+  storage = Storage(settings['oauth_storage'])
   credentials = storage.get()
 
+  # Authorize an instance of httplib2.Http.
   if credentials is None or credentials.invalid:
     credentials = run(flow, storage)
   http = httplib2.Http()
   auth_http = credentials.authorize(http)
 
-  gce_helper = gce.Gce(auth_http, settings.GCE_PROJECT_ID)
+  gce_helper = gce.Gce(auth_http, settings['project'])
 
   # Start an image with a local start-up script.
-  print 'Starting up an instance'
+  logging.info('Starting up an instance')
   instance_name = 'startup-script-demo'
   try:
     gce_helper.start_instance(
-        instance_name, startup_script='startup.sh', metadata=[{
-            'key': 'url',
-            'value': settings.IMAGE_URL
-        }, {
-            'key': 'text',
-            'value': settings.IMAGE_TEXT
-        }, {
-            'key': 'cs-bucket',
-            'value': settings.GCS_BUCKET
-        }])
+        instance_name,
+        service_email=settings['compute']['service_email'],
+        scopes=settings['compute']['scopes'],
+        startup_script='startup.sh',
+        metadata=[
+            {'key': 'url', 'value': settings['image_url']},
+            {'key': 'text', 'value': settings['image_text']},
+            {'key': 'cs-bucket', 'value': settings['storage']['bucket']}])
+  except gce.ApiError, e:
+    logging.error('Error starting instance.')
+    logging.error(e)
+    return
   except gce.ApiOperationError as e:
-    print 'Error starting instance'
-    print e
+    logging.error('Error starting instance')
+    logging.error(e)
     return
 
   # List all running instances.
-  print 'Here are your running instances:'
+  logging.info('Here are your running instances:')
   instances = gce_helper.list_instances()
   for instance in instances:
-    print instance['name']
+    logging.info(instance['name'])
 
-  print 'Visit http://storage.googleapis.com/%s/output.png' % (
-      settings.GCS_BUCKET)
-  print 'It might take a minute for the output.png file to show up.'
+  logging.info('Visit http://storage.googleapis.com/%s/output.png' % (
+      settings['storage']['bucket']))
+  logging.info('It might take a minute for the output.png file to show up.')
   raw_input('Hit Enter when done to shutdown instance')
 
   # Stop the instance.
-  print 'Shutting down the instance'
+  logging.info('Shutting down the instance')
   try:
     gce_helper.stop_instance(instance_name)
-  except gce.ApiOperationError as e:
-    print 'Error stopping instance'
-    print e
+  except gce.ApiError, e:
+    logging.error('Error stopping instance.')
+    logging.error(e)
+    return
+  except gce.ApiOperationError, e:
+    logging.error('Error stopping instance')
+    logging.error(e)
     return
 
+  logging.info('Remember to delete the output.png file in ' + settings[
+      'storage']['bucket'])
 
 if __name__ == '__main__':
   main()

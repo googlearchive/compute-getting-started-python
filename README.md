@@ -1,15 +1,21 @@
 # Getting Started with Compute Engine and the Google Python Client Library
 
-Google Compute Engine features a RESTful API that allows developers to run virtual machines in the cloud. This sample python command-line application demonstrates how to access the Compute Engine API using the Google Python API Client Library. For more information about the library, read the [Getting Started: Google Python Client Library documentation][1].
+Google Compute Engine features a RESTful API that allows developers to
+run virtual machines in the cloud. This sample python command-line application
+demonstrates how to access the Compute Engine API using the Google Python API
+Client Library. For more information about the library, read the
+[Getting Started: Google Python Client Library documentation][1].
 
 To run the demo:
 
-- Update the variables in the settings.py file.
-    - GCE_PROJECT_ID: your Compute Engine [project ID][2].
-    - IMAGE_URL: the string URL of an image (for example, http://lh6.ggpht.com/-TqOY_FXI6cE/SbGZ0Nb0UtI/AAAAAAAADG4/m_Kr5y-IPpM/s640/android-wallpaper5_2560x1600.jpg)
-    - IMAGE_TEXT: some text to display over the image.
-    - GCS_BUCKET: your bucket on Google Cloud Storage.
-- Update the client_secrets.json file with your client id and secret found in the [Google APIs Console][3].
+- Update the variables in the settings.json file.
+    - &lt;your-project-id>: your Compute Engine [project ID][2].
+    - &lt;image-url>: the string URL of an image (for example,
+      http://lh6.ggpht.com/-TqOY_FXI6cE/SbGZ0Nb0UtI/AAAAAAAADG4/m_Kr5y-IPpM/s640/android-wallpaper5_2560x1600.jpg)
+    - &lt;image-text>: some text to display over the image.
+    - &lt;your-cloud-storage-bucket>: your bucket on Google Cloud Storage.
+- Update the client_secrets.json file with your client id and secret found in
+  the [Google APIs Console][3].
 - Run the sample using the command:
 
 python main.py

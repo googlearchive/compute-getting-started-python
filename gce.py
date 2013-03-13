@@ -24,6 +24,12 @@ Use this class to:
 
 __author__ = 'kbrisbin@google.com (Kathryn Hurley)'
 
+import logging
+try:
+  import simplejson as json
+except:
+  import json
+import time
 import traceback
 
 from apiclient.discovery import build
@@ -31,52 +37,67 @@ from apiclient.errors import HttpError
 from httplib2 import HttpLib2Error
 from oauth2client.client import AccessTokenRefreshError
 
-import settings
-
-GCE_URL = 'https://www.googleapis.com/compute/%s/projects/' % (
-    settings.API_VERSION)
-GCE_SCOPE = 'https://www.googleapis.com/auth/compute'
+SETTINGS_FILE = 'settings_test.json'
 
 
 class Gce(object):
-  """Demonstrates some of the image and instance API functionality."""
+  """Demonstrates some of the image and instance API functionality.
 
-  def __init__(self, auth_http, project_id):
+  Attributes:
+    settings: A dictionary of application settings from the settings.json file.
+    service: An apiclient.discovery.Resource object for Compute Engine.
+    project_id: The string Compute Engine project ID.
+    project_url: The string URL of the Compute Engine project.
+  """
+
+  def __init__(self, auth_http, project_id=None):
     """Initialize the Gce object.
 
     Args:
-      auth_http: an authorized instance of Http
-      project_id: the API console project name
+      auth_http: an authorized instance of httplib2.Http.
+      project_id: the API console project name.
     """
-    self.service = build('compute', settings.API_VERSION, http=auth_http)
-    self.project_id = project_id
-    self.project_url = GCE_URL + self.project_id
+
+    self.settings = json.loads(open(SETTINGS_FILE, 'r').read())
+
+    self.service = build(
+        'compute', self.settings['compute']['api_version'], http=auth_http)
+
+    self.gce_url = 'https://www.googleapis.com/compute/%s/projects/' % (
+        self.settings['compute']['api_version'])
+
+    self.project_id = None
+    if not project_id:
+      self.project_id = self.settings['project']
+    else:
+      self.project_id = project_id
+    self.project_url = self.gce_url + self.project_id
 
   def start_instance(self,
                      instance_name,
-                     zone=settings.DEFAULT_ZONE,
-                     machine_type=settings.DEFAULT_MACHINE_TYPE,
-                     disk=settings.DEFAULT_DISK,
-                     image=settings.DEFAULT_IMAGE,
-                     service_email=settings.DEFAULT_SERVICE_EMAIL,
-                     network=settings.DEFAULT_NETWORK,
+                     zone=None,
+                     machine_type=None,
+                     image=None,
+                     network=None,
+                     disk=None,
+                     service_email=None,
                      scopes=None,
                      metadata=None,
                      startup_script=None,
                      startup_script_url=None,
                      blocking=True):
-    """Start instance with the given name and settings.
+    """Start an instance with the given name and settings.
 
     Args:
       instance_name: String name for instance.
       zone: The string zone name.
       machine_type: The string machine type.
-      disk: The string disk.
-      image: The string image name.
-      service_email: The string service email.
+      image: The string name of a custom image.
       network: The string network.
+      disk: The string disk.
+      service_email: The string service email.
       scopes: List of string scopes.
-      metadata: List of metadata objects.
+      metadata: List of metadata dictionaries.
       startup_script: The filename of a startup script.
       startup_script_url: Url of a startup script.
       blocking: Whether the function will wait for the operation to complete.
@@ -87,58 +108,57 @@ class Gce(object):
     Raises:
       ApiOperationError: Operation contains an error message.
     """
+
     if not instance_name:
-      print 'instance_name required.'
+      logging.error('instance_name required.')
       return
 
-    image_url = None
-    if image == settings.DEFAULT_IMAGE:
-      image_url = '%sgoogle/global/images/%s' % (GCE_URL, image)
+    # Set required instance fields with defaults if not provided.
+    instance = {}
+    instance['name'] = instance_name
+    if not machine_type:
+      machine_type = self.settings['compute']['machine_type']
+    instance['machineType'] = '%s/global/machineTypes/%s' % (
+        self.project_url, machine_type)
+    if not image:
+      instance['image'] = '%sgoogle/global/images/%s' % (
+          self.gce_url, self.settings['compute']['image'])
     else:
-      image_url = '%s/global/images/%s' % (self.project_url, image)
-    if not scopes: scopes = settings.DEFAULT_SCOPES
+      instance['image'] = '%s/global/images/%s' % (
+          self.project_url, image)
+    if not network:
+      network = self.settings['compute']['network']
+    instance['networkInterfaces'] = [{
+        'accessConfigs': [{'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}],
+        'network': '%s/global/networks/%s' % (self.project_url, network)}]
 
-    instance = {
-        'name': instance_name,
-        'machineType': '%s/global/machineTypes/%s' % (
-            self.project_url, machine_type),
-        'image': image_url,
-        'disks': [{
-            'type': disk
-        }],
-        'networkInterfaces': [{
-            'accessConfigs': [{
-                'type': 'ONE_TO_ONE_NAT',
-                'name': 'External NAT'
-            }],
-            'network': '%s/global/networks/%s' % (self.project_url, network)
-        }],
-        'serviceAccounts': [{
-            'email': service_email,
-            'scopes': scopes
-        }]
-    }
+    # Set optional fields with provided values.
+    if disk:
+      instance['disks'] = [{'type': disk}]
+    if service_email and scopes:
+      instance['serviceAccounts'] = [{'email': service_email, 'scopes': scopes}]
 
+    # Set the instance metadata if provided.
     instance['metadata'] = {}
     instance['metadata']['items'] = []
-
     if metadata:
       instance['metadata']['items'].extend(metadata)
 
+    # Set the instance startup script if provided.
     if startup_script:
       startup_script_resource = {
-          'key': 'startup-script',
-          'value': open(startup_script, 'r').read()
-      }
+          'key': 'startup-script', 'value': open(startup_script, 'r').read()}
       instance['metadata']['items'].append(startup_script_resource)
 
+    # Set the instance startup script URL if provided.
     if startup_script_url:
       startup_script_url_resource = {
-          'key': 'startup-script-url',
-          'value': startup_script_url
-      }
+          'key': 'startup-script-url', 'value': startup_script_url}
       instance['metadata']['items'].append(startup_script_url_resource)
 
+    # Send the request.
+    if not zone:
+      zone = self.settings['compute']['zone']
     request = self.service.instances().insert(
         project=self.project_id, zone=zone, body=instance)
     response = self._execute_request(request)
@@ -150,7 +170,7 @@ class Gce(object):
 
     return response
 
-  def list_instances(self, zone=settings.DEFAULT_ZONE, list_filter=None):
+  def list_instances(self, zone=None, list_filter=None):
     """Lists project instances.
 
     Args:
@@ -160,6 +180,10 @@ class Gce(object):
     Returns:
       List of instances matching given filter.
     """
+
+    if not zone:
+      zone = self.settings['compute']['zone']
+
     request = None
     if list_filter:
       request = self.service.instances().list(
@@ -168,13 +192,14 @@ class Gce(object):
       request = self.service.instances().list(
           project=self.project_id, zone=zone)
     response = self._execute_request(request)
+
     if response and 'items' in response:
       return response['items']
     return []
 
   def stop_instance(self,
                     instance_name,
-                    zone=settings.DEFAULT_ZONE,
+                    zone=None,
                     blocking=True):
     """Stops instances.
 
@@ -189,9 +214,13 @@ class Gce(object):
     Raises:
       ApiOperationError: Operation contains an error message.
     """
+
     if not instance_name:
-      print 'instance_name required.'
+      logging.error('instance_name required.')
       return
+
+    if not zone:
+      zone = self.settings['compute']['zone']
 
     request = self.service.instances().delete(
         project=self.project_id, zone=zone, instance=instance_name)
@@ -209,10 +238,13 @@ class Gce(object):
 
     Args:
       response: the response from the API call.
+
     Returns:
       Dictionary response representing the operation.
     """
+
     status = response['status']
+
     while status != 'DONE' and response:
       operation_id = response['name']
       if 'zone' in response:
@@ -225,6 +257,11 @@ class Gce(object):
       response = self._execute_request(request)
       if response:
         status = response['status']
+        logging.info(
+            'Waiting until operation is DONE. Current status: %s', status)
+        if status != 'DONE':
+          time.sleep(3)
+
     return response
 
   def _execute_request(self, request):
@@ -235,30 +272,37 @@ class Gce(object):
 
     Returns:
       Dictionary response representing the operation if successful.
+
+    Raises:
+      ApiError: Error occurred during API call.
     """
+
     try:
       response = request.execute()
-    except AccessTokenRefreshError:
-      print 'Access token is invalid.'
-      traceback.print_exc()
-      return
-    except HttpError:
-      print 'Http response was not 2xx.'
-      traceback.print_exc()
-      return
-    except HttpLib2Error:
-      print 'Transport error.'
-      traceback.print_exc()
-      return
-    except:
-      print 'Unexpected error occured.'
-      traceback.print_exc()
-      return
+    except AccessTokenRefreshError, e:
+      logging.error('Access token is invalid.')
+      raise ApiError(e)
+    except HttpError, e:
+      logging.error('Http response was not 2xx.')
+      raise ApiError(e)
+    except HttpLib2Error, e:
+      logging.error('Transport error.')
+      raise ApiError(e)
+    except Exception, e:
+      logging.error('Unexpected error occured.')
+      traceback.print_stacktrace()
+      raise ApiError(e)
+
     return response
 
 
 class Error(Exception):
   """Base class for exceptions in this module."""
+  pass
+
+
+class ApiError(Error):
+  """Error occurred during API call."""
   pass
 
 
@@ -271,9 +315,11 @@ class ApiOperationError(Error):
     Args:
       error_list: the list of errors from the operation.
     """
+
     super(ApiOperationError, self).__init__()
     self.error_list = error_list
 
   def __str__(self):
     """String representation of the error."""
+
     return repr(self.error_list)

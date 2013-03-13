@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 apt-get -y install imagemagick
-IMAGE_URL=$(curl http://metadata/0.1/meta-data/attributes/url)
-TEXT=$(curl http://metadata/0.1/meta-data/attributes/text)
-CS_BUCKET=$(curl http://metadata/0.1/meta-data/attributes/cs-bucket)
+IMAGE_URL=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/url)
+TEXT=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/text)
+CS_BUCKET=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/cs-bucket)
 mkdir image-output
 cd image-output
 wget $IMAGE_URL
