@@ -1,0 +1,20 @@
+{
+  "project": "<your-project-id>",
+  "client_secrets": "client_secrets.json",
+  "compute_scope": ["https://www.googleapis.com/auth/compute"],
+  "oauth_storage": "oauth2.dat",
+  "image_url": "<image-url>",
+  "image_text": "<image-text>",
+  "compute": {
+    "api_version": "v1beta14",
+    "machine_type": "n1-standard-1",
+    "zone": "us-central1-a",
+    "image": "gcel-12-04-v20121106",
+    "service_email": "default",
+    "network": "default",
+    "scopes": ["https://www.googleapis.com/auth/devstorage.full_control"]
+  },
+  "storage": {
+    "bucket": "<your-cloud-storage-bucket>"
+  }
+}

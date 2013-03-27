@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-#
-# Copyright 2012 Google Inc.
+# Copyright 2012 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +16,7 @@
 
 Demo steps:
 
-- Create an instance with a start up script and metadata. 
+- Create an instance with a start up script and metadata.
 - Print out the URL where the modified image will be written.
 - The start up script executes these steps on the instance:
     - Installs Image Magick on the machine.
@@ -102,8 +100,9 @@ def main():
   for instance in instances:
     logging.info(instance['name'])
 
-  logging.info('Visit http://storage.googleapis.com/%s/output.png' % (
-      settings['storage']['bucket']))
+  logging.info(
+      'Visit http://storage.googleapis.com/%s/output.png',
+      settings['storage']['bucket'])
   logging.info('It might take a minute for the output.png file to show up.')
   raw_input('Hit Enter when done to shutdown instance')
 

@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-#
-# Copyright 2012 Google Inc.
+# Copyright 2012 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +35,7 @@ from apiclient.errors import HttpError
 from httplib2 import HttpLib2Error
 from oauth2client.client import AccessTokenRefreshError
 
-SETTINGS_FILE = 'settings_test.json'
+SETTINGS_FILE = 'settings.json'
 
 
 class Gce(object):
