@@ -75,9 +75,11 @@ def main():
   # Start an image with a local start-up script.
   logging.info('Starting up an instance')
   instance_name = 'startup-script-demo'
+  zone_name = settings['compute']['zone']
   try:
     gce_helper.start_instance(
         instance_name,
+	zone=zone_name,
         service_email=settings['compute']['service_email'],
         scopes=settings['compute']['scopes'],
         startup_script='startup.sh',
@@ -109,7 +111,7 @@ def main():
   # Stop the instance.
   logging.info('Shutting down the instance')
   try:
-    gce_helper.stop_instance(instance_name)
+    gce_helper.stop_instance(instance_name, zone=zone_name)
   except gce.ApiError, e:
     logging.error('Error stopping instance.')
     logging.error(e)

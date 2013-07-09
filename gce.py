@@ -75,6 +75,7 @@ class Gce(object):
                      instance_name,
                      zone=None,
                      machine_type=None,
+                     image_project=None,
                      image=None,
                      network=None,
                      disk=None,
@@ -90,6 +91,7 @@ class Gce(object):
       instance_name: String name for instance.
       zone: The string zone name.
       machine_type: The string machine type.
+      image_project: The string name for the project of the custom image.
       image: The string name of a custom image.
       network: The string network.
       disk: The string disk.
@@ -114,16 +116,18 @@ class Gce(object):
     # Set required instance fields with defaults if not provided.
     instance = {}
     instance['name'] = instance_name
+    if not zone:
+      zone = self.settings['compute']['zone']
     if not machine_type:
       machine_type = self.settings['compute']['machine_type']
-    instance['machineType'] = '%s/global/machineTypes/%s' % (
-        self.project_url, machine_type)
+    instance['machineType'] = '%s/zones/%s/machineTypes/%s' % (
+        self.project_url, zone, machine_type)
+    if not image_project:
+      image_project = self.settings['compute']['image_project']
     if not image:
-      instance['image'] = '%sgoogle/global/images/%s' % (
-          self.gce_url, self.settings['compute']['image'])
-    else:
-      instance['image'] = '%s/global/images/%s' % (
-          self.project_url, image)
+      image = self.settings['compute']['image']
+    instance['image'] = '%s%s/global/images/%s' % (self.gce_url, image_project,
+        image)
     if not network:
       network = self.settings['compute']['network']
     instance['networkInterfaces'] = [{
@@ -155,8 +159,6 @@ class Gce(object):
       instance['metadata']['items'].append(startup_script_url_resource)
 
     # Send the request.
-    if not zone:
-      zone = self.settings['compute']['zone']
     request = self.service.instances().insert(
         project=self.project_id, zone=zone, body=instance)
     response = self._execute_request(request)
