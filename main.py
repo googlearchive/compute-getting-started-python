@@ -53,7 +53,7 @@ IMAGE_URL = 'http://storage.googleapis.com/gce-demo-input/photo.jpg'
 IMAGE_TEXT = 'Ready for dessert?'
 INSTANCE_NAME = 'startup-script-demo'
 DISK_NAME = INSTANCE_NAME + '-disk'
-INSERT_ERROR = 'Error inserting %s.'
+INSERT_ERROR = 'Error inserting %(name)s.'
 DELETE_ERROR = """
 Error deleting %(name)s. %(name)s might still exist; You can use
 the console (http://cloud.google.com/console) to delete %(name)s.
@@ -73,7 +73,7 @@ def delete_resource(delete_method, *args):
   try:
     delete_method(*args)
   except (gce.ApiError, gce.ApiOperationError, ValueError) as e:
-    logging.error(DELETE_ERROR % resource_name)
+    logging.error(DELETE_ERROR, {'name': resource_name})
     logging.error(e)
 
 
