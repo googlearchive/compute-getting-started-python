@@ -1,4 +1,4 @@
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2013 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,13 +49,40 @@ from oauth2client.tools import run
 
 import gce
 
+IMAGE_URL = 'http://storage.googleapis.com/gce-demo-input/photo.jpg'
+IMAGE_TEXT = 'Ready for dessert?'
+INSTANCE_NAME = 'startup-script-demo'
+DISK_NAME = INSTANCE_NAME + '-disk'
+INSERT_ERROR = 'Error inserting %s.'
+DELETE_ERROR = """
+Error deleting %(name)s. %(name)s might still exist; You can use
+the console (http://cloud.google.com/console) to delete %(name)s.
+"""
+
+
+def delete_resource(delete_method, *args):
+  """Delete a Compute Engine resource using the supplied method and args.
+
+  Args:
+    delete_method: The gce.Gce method for deleting the resource.
+  """
+
+  resource_name = args[0]
+  logging.info('Deleting %s' % resource_name)
+
+  try:
+    delete_method(*args)
+  except (gce.ApiError, gce.ApiOperationError, ValueError) as e:
+    logging.error(DELETE_ERROR % resource_name)
+    logging.error(e)
+
 
 def main():
   """Perform OAuth 2 authorization, then start, list, and stop instance(s)."""
 
   logging.basicConfig(level=logging.INFO)
 
-  # Load GCE settings.
+  # Load the settings for this sample app.
   settings = json.loads(open(gce.SETTINGS_FILE, 'r').read())
 
   # Perform OAuth 2.0 authorization flow.
@@ -70,59 +97,73 @@ def main():
   http = httplib2.Http()
   auth_http = credentials.authorize(http)
 
-  gce_helper = gce.Gce(auth_http, settings['project'])
+  # Retrieve user input.
+  image_url = raw_input(
+      'Enter the URL of an image [Defaults to %s]: ' % IMAGE_URL)
+  if not image_url:
+    image_url = IMAGE_URL
+  image_text = raw_input(
+      'Enter text to add to the image [Defaults to "%s"]: ' % IMAGE_TEXT)
+  if not image_text:
+    image_text = IMAGE_TEXT
+  bucket = raw_input('Enter a Cloud Storage bucket [Required]: ')
+  if not bucket:
+    logging.error('Cloud Storage bucket required.')
+    return
 
-  # Start an image with a local start-up script.
-  logging.info('Starting up an instance')
-  instance_name = 'startup-script-demo'
-  zone_name = settings['compute']['zone']
+  # Initialize gce.Gce.
+  gce_helper = gce.Gce(auth_http, project_id=settings['project'])
+
+  # Create a Persistent Disk (PD), which is used as a boot disk.
+  try:
+    gce_helper.create_disk(DISK_NAME)
+  except (gce.ApiError, gce.ApiOperationError, ValueError, Exception) as e:
+    logging.error(INSERT_ERROR, {'name': DISK_NAME})
+    logging.error(e)
+    return
+
+  # Start an instance with a local start-up script and boot disk.
+  logging.info('Starting GCE instance')
   try:
     gce_helper.start_instance(
-        instance_name,
-	zone=zone_name,
+        INSTANCE_NAME,
+        DISK_NAME,
         service_email=settings['compute']['service_email'],
         scopes=settings['compute']['scopes'],
         startup_script='startup.sh',
         metadata=[
-            {'key': 'url', 'value': settings['image_url']},
-            {'key': 'text', 'value': settings['image_text']},
-            {'key': 'cs-bucket', 'value': settings['storage']['bucket']}])
-  except gce.ApiError, e:
-    logging.error('Error starting instance.')
+            {'key': 'url', 'value': image_url},
+            {'key': 'text', 'value': image_text},
+            {'key': 'cs-bucket', 'value': bucket}])
+  except (gce.ApiError, gce.ApiOperationError, ValueError, Exception) as e:
+    # Delete the disk in case the instance fails to start.
+    delete_resource(gce_helper.delete_disk, DISK_NAME)
+    logging.error(INSERT_ERROR, {'name': INSTANCE_NAME})
     logging.error(e)
     return
-  except gce.ApiOperationError as e:
-    logging.error('Error starting instance')
+  except gce.DiskDoesNotExistError as e:
+    logging.error(INSERT_ERROR, {'name': INSTANCE_NAME})
     logging.error(e)
     return
 
   # List all running instances.
-  logging.info('Here are your running instances:')
+  logging.info('These are your running instances:')
   instances = gce_helper.list_instances()
   for instance in instances:
     logging.info(instance['name'])
 
   logging.info(
-      'Visit http://storage.googleapis.com/%s/output.png',
-      settings['storage']['bucket'])
+      'Visit http://storage.googleapis.com/%s/output.png.' % bucket)
   logging.info('It might take a minute for the output.png file to show up.')
-  raw_input('Hit Enter when done to shutdown instance')
+  raw_input('Hit Enter when done to shutdown instance.')
 
   # Stop the instance.
-  logging.info('Shutting down the instance')
-  try:
-    gce_helper.stop_instance(instance_name, zone=zone_name)
-  except gce.ApiError, e:
-    logging.error('Error stopping instance.')
-    logging.error(e)
-    return
-  except gce.ApiOperationError, e:
-    logging.error('Error stopping instance')
-    logging.error(e)
-    return
+  delete_resource(gce_helper.stop_instance, INSTANCE_NAME)
 
-  logging.info('Remember to delete the output.png file in ' + settings[
-      'storage']['bucket'])
+  # Delete the disk.
+  delete_resource(gce_helper.delete_disk, DISK_NAME)
+
+  logging.info('Remember to delete the output.png file in ' + bucket)
 
 if __name__ == '__main__':
   main()

@@ -10,10 +10,6 @@ To run the demo:
 
 - Update the variables in the settings.json file.
     - &lt;your-project-id>: your Compute Engine [project ID][2].
-    - &lt;image-url>: the string URL of an image (for example,
-      http://lh6.ggpht.com/-TqOY_FXI6cE/SbGZ0Nb0UtI/AAAAAAAADG4/m_Kr5y-IPpM/s640/android-wallpaper5_2560x1600.jpg)
-    - &lt;image-text>: some text to display over the image.
-    - &lt;your-cloud-storage-bucket>: your bucket on Google Cloud Storage.
 - Update the client_secrets.json file with your client id and secret found in
   the [Google APIs Console][3].
 - Run the sample using the command:
@@ -40,6 +36,8 @@ Demo steps:
 
 ## Dependencies
 - [Google APIs Client Library for Python][7]
+- [python-gflags][8]
+- [httplib2][9]
 
 [1]: https://developers.google.com/compute/docs/api/python_guide
 [2]: https://developers.google.com/compute/docs/overview#concepts
@@ -48,3 +46,5 @@ Demo steps:
 [5]: https://developers.google.com/storage
 [6]: https://python.org
 [7]: http://code.google.com/p/google-api-python-client/
+[8]: https://code.google.com/p/python-gflags/
+[9]: https://code.google.com/p/httplib2/

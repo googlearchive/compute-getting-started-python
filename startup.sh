@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 apt-get -y install imagemagick
-IMAGE_URL=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/url)
-TEXT=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/text)
-CS_BUCKET=$(curl http://metadata/computeMetadata/v1beta1/instance/attributes/cs-bucket)
+IMAGE_URL=$(curl http://metadata/computeMetadata/v1/instance/attributes/url -H "X-Google-Metadata-Request: True")
+TEXT=$(curl http://metadata/computeMetadata/v1/instance/attributes/text -H "X-Google-Metadata-Request: True")
+CS_BUCKET=$(curl http://metadata/computeMetadata/v1/instance/attributes/cs-bucket -H "X-Google-Metadata-Request: True")
 mkdir image-output
 cd image-output
 wget $IMAGE_URL
-convert * -pointsize 30 -fill black -annotate +10+40 $TEXT output.png
+convert * -pointsize 50 -fill white -annotate +20+60 "$TEXT" output.png
 gsutil cp -a public-read output.png gs://$CS_BUCKET/output.png

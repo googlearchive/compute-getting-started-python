@@ -36,6 +36,7 @@ from httplib2 import HttpLib2Error
 from oauth2client.client import AccessTokenRefreshError
 
 SETTINGS_FILE = 'settings.json'
+DISK_TYPE = 'PERSISTENT'
 
 
 class Gce(object):
@@ -61,7 +62,7 @@ class Gce(object):
     self.service = build(
         'compute', self.settings['compute']['api_version'], http=auth_http)
 
-    self.gce_url = 'https://www.googleapis.com/compute/%s/projects/' % (
+    self.gce_url = 'https://www.googleapis.com/compute/%s/projects' % (
         self.settings['compute']['api_version'])
 
     self.project_id = None
@@ -69,16 +70,14 @@ class Gce(object):
       self.project_id = self.settings['project']
     else:
       self.project_id = project_id
-    self.project_url = self.gce_url + self.project_id
+    self.project_url = '%s/%s' % (self.gce_url, self.project_id)
 
   def start_instance(self,
                      instance_name,
+                     disk_name,
                      zone=None,
                      machine_type=None,
-                     image_project=None,
-                     image=None,
                      network=None,
-                     disk=None,
                      service_email=None,
                      scopes=None,
                      metadata=None,
@@ -89,12 +88,10 @@ class Gce(object):
 
     Args:
       instance_name: String name for instance.
+      disk_name: The string disk name.
       zone: The string zone name.
       machine_type: The string machine type.
-      image_project: The string name for the project of the custom image.
-      image: The string name of a custom image.
       network: The string network.
-      disk: The string disk.
       service_email: The string service email.
       scopes: List of string scopes.
       metadata: List of metadata dictionaries.
@@ -107,14 +104,21 @@ class Gce(object):
 
     Raises:
       ApiOperationError: Operation contains an error message.
+      DiskDoesNotExistError: Disk to be used for instance boot does not exist.
+      ValueError: Either instance_name is None an empty string or disk_name
+          is None or an empty string.
     """
 
     if not instance_name:
-      logging.error('instance_name required.')
-      return
+      raise ValueError('instance_name required.')
+
+    if not disk_name:
+      raise ValueError('disk_name required.')
+
+    # Instance dictionary is sent in the body of the API request.
+    instance = {}
 
     # Set required instance fields with defaults if not provided.
-    instance = {}
     instance['name'] = instance_name
     if not zone:
       zone = self.settings['compute']['zone']
@@ -122,21 +126,23 @@ class Gce(object):
       machine_type = self.settings['compute']['machine_type']
     instance['machineType'] = '%s/zones/%s/machineTypes/%s' % (
         self.project_url, zone, machine_type)
-    if not image_project:
-      image_project = self.settings['compute']['image_project']
-    if not image:
-      image = self.settings['compute']['image']
-    instance['image'] = '%s%s/global/images/%s' % (self.gce_url, image_project,
-        image)
     if not network:
       network = self.settings['compute']['network']
     instance['networkInterfaces'] = [{
         'accessConfigs': [{'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}],
         'network': '%s/global/networks/%s' % (self.project_url, network)}]
 
+    # Make sure the disk exists, and apply disk to instance resource.
+    disk_exists = self.get_disk(disk_name)
+    if not disk_exists:
+      raise DiskDoesNotExistError(disk_name + ' disk must exist.')
+    instance['disks'] = [{
+        'source': '%s/zones/%s/disks/%s' % (self.project_url, zone, disk_name),
+        'boot': True,
+        'type': DISK_TYPE
+    }]
+
     # Set optional fields with provided values.
-    if disk:
-      instance['disks'] = [{'type': disk}]
     if service_email and scopes:
       instance['serviceAccounts'] = [{'email': service_email, 'scopes': scopes}]
 
@@ -201,7 +207,7 @@ class Gce(object):
                     instance_name,
                     zone=None,
                     blocking=True):
-    """Stops instances.
+    """Stops an instance.
 
     Args:
       instance_name: String name for the instance.
@@ -213,17 +219,129 @@ class Gce(object):
 
     Raises:
       ApiOperationError: Operation contains an error message.
+      ValueError: instance_name is None or an empty string.
     """
 
     if not instance_name:
-      logging.error('instance_name required.')
-      return
+      raise ValueError('instance_name required.')
 
     if not zone:
       zone = self.settings['compute']['zone']
 
+    # Delete the instance.
     request = self.service.instances().delete(
         project=self.project_id, zone=zone, instance=instance_name)
+    response = self._execute_request(request)
+    if response and blocking:
+      response = self._blocking_call(response)
+
+    if response and 'error' in response:
+      raise ApiOperationError(response['error']['errors'])
+
+    return response
+
+  def create_disk(self,
+                  disk_name,
+                  image_project=None,
+                  image=None,
+                  zone=None,
+                  blocking=True):
+    """Creates a new persistent disk.
+
+    Args:
+      disk_name: String name for the disk.
+      image_project: The string name for the project of the image.
+      image: String name of the image to apply to the disk.
+      zone: The string zone name.
+      blocking: Whether the function will wait for the operation to complete.
+
+    Returns:
+      Dictionary response representing the operation.
+
+    Raises:
+      ApiOperationError: Operation contains an error message.
+      ValueError: disk_name is None or an empty string.
+    """
+
+    if not disk_name:
+      raise ValueError('disk_name required.')
+
+    # Disk dictionary is sent in the body of the API request.
+    disk = {}
+
+    # Set required disk fields with defaults if not provided.
+    disk['name'] = disk_name
+    if not zone:
+      zone = self.settings['compute']['zone']
+    if not image_project:
+      image_project = self.settings['compute']['image_project']
+    if not image:
+      image = self.settings['compute']['image']
+    source_image = '%s/%s/global/images/%s' % (
+        self.gce_url, image_project, image)
+
+    request = self.service.disks().insert(
+        project=self.project_id,
+        zone=zone,
+        sourceImage=source_image,
+        body=disk)
+    response = self._execute_request(request)
+    if response and blocking:
+      response = self._blocking_call(response)
+
+    if response and 'error' in response:
+      raise ApiOperationError(response['error']['errors'])
+
+    return response
+
+  def get_disk(self, disk_name, zone=None):
+    """Gets the specified disk by name.
+
+    Args:
+      disk_name: The string name of the disk.
+      zone: The string name of the zone.
+
+    Returns:
+      Dictionary response representing the disk or None if the disk
+      does not exist.
+    """
+
+    if not zone:
+      zone = self.settings['compute']['zone']
+
+    request = self.service.disks().get(
+        project=self.project_id, zone=zone, disk=disk_name)
+    try:
+      response = self._execute_request(request)
+      return response
+    except ApiError, e:
+      return
+
+  def delete_disk(self, disk_name, zone=None, blocking=True):
+    """Deletes a disk.
+
+    Args:
+      disk_name: String name for the disk.
+      zone: The string zone name.
+      blocking: Whether the function will wait for the operation to complete.
+
+    Returns:
+      Dictionary response representing the operation.
+
+    Raises:
+      ApiOperationError: Operation contains an error message.
+      ValueError: disk_name is None or an empty string.
+    """
+
+    if not disk_name:
+      raise ValueError('disk_name required.')
+
+    if not zone:
+      zone = self.settings['compute']['zone']
+
+    # Delete the disk.
+    request = self.service.disks().delete(
+        project=self.project_id, zone=zone, disk=disk_name)
     response = self._execute_request(request)
     if response and blocking:
       response = self._blocking_call(response)
@@ -237,7 +355,7 @@ class Gce(object):
     """Blocks until the operation status is done for the given operation.
 
     Args:
-      response: the response from the API call.
+      response: The response from the API call.
 
     Returns:
       Dictionary response representing the operation.
@@ -268,7 +386,7 @@ class Gce(object):
     """Helper method to execute API requests.
 
     Args:
-      request: the API request to execute.
+      request: The API request to execute.
 
     Returns:
       Dictionary response representing the operation if successful.
@@ -290,7 +408,7 @@ class Gce(object):
       raise ApiError(e)
     except Exception, e:
       logging.error('Unexpected error occured.')
-      traceback.print_stacktrace()
+      traceback.print_stack()
       raise ApiError(e)
 
     return response
@@ -323,3 +441,8 @@ class ApiOperationError(Error):
     """String representation of the error."""
 
     return repr(self.error_list)
+
+
+class DiskDoesNotExistError(Error):
+  """Disk to be used for instance boot does not exist."""
+  pass
