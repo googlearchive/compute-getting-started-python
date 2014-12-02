@@ -41,7 +41,7 @@ Demo steps:
 
 Python dependencies can be installed via pip:
 ```
-pip install google-api-python-client python-gflags httplib2
+pip install -r requirements.txt
 ```
 
 [1]: https://developers.google.com/compute/docs/api/python_guide
