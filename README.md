@@ -18,7 +18,7 @@ python main.py
 
 Demo steps:
 
-- Create an instance with a start up script and metadata. 
+- Create an instance with a start up script and metadata.
 - Print out the URL where the modified image will be written.
 - The start up script executes these steps on the instance:
     - Installs Image Magick on the machine.
@@ -38,6 +38,11 @@ Demo steps:
 - [Google APIs Client Library for Python][7]
 - [python-gflags][8]
 - [httplib2][9]
+
+Python dependencies can be installed via pip:
+```
+pip install -r requirements.txt
+```
 
 [1]: https://developers.google.com/compute/docs/api/python_guide
 [2]: https://developers.google.com/compute/docs/overview#concepts
