@@ -1,4 +1,4 @@
-# Copyright 2013 Google Inc. All Rights Reserved.
+# Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,158 +12,153 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Google Compute Engine demo using the Google Python Client Library.
-
-Demo steps:
-
-- Create an instance with a start up script and metadata.
-- Print out the URL where the modified image will be written.
-- The start up script executes these steps on the instance:
-    - Installs Image Magick on the machine.
-    - Downloads the image from the URL provided in the metadata.
-    - Adds the text provided in the metadata to the image.
-    - Copies the edited image to Cloud Storage.
-- After recieving input from the user, shut down the instance.
-
-To run this demo:
-- Edit the client id and secret in the client_secrets.json file.
-- Enter your Compute Engine API console project name below.
-- Enter the URL of an image in the code below.
-- Create a bucket on Google Cloud Storage accessible by your console project:
-http://cloud.google.com/products/cloud-storage.html
-- Enter the name of the bucket below.
+"""
+Google Compute Engine demo using the Google Python Client Library.
 """
 
-__author__ = 'kbrisbin@google.com (Kathryn Hurley)'
+__author__ = 'jonwayne@google.com (Jon Wayne Parrott)'
 
-import logging
-try:
-  import simplejson as json
-except:
-  import json
+import sys
+import time
 
-import httplib2
-from oauth2client.client import flow_from_clientsecrets
-from oauth2client.file import Storage
-from oauth2client.tools import run
-
-import gce
-
-IMAGE_URL = 'http://storage.googleapis.com/gce-demo-input/photo.jpg'
-IMAGE_TEXT = 'Ready for dessert?'
-INSTANCE_NAME = 'startup-script-demo'
-DISK_NAME = INSTANCE_NAME + '-disk'
-INSERT_ERROR = 'Error inserting %(name)s.'
-DELETE_ERROR = """
-Error deleting %(name)s. %(name)s might still exist; You can use
-the console (http://cloud.google.com/console) to delete %(name)s.
-"""
+from oauth2client.client import GoogleCredentials
+from googleapiclient.discovery import build
 
 
-def delete_resource(delete_method, *args):
-  """Delete a Compute Engine resource using the supplied method and args.
+# [START list_instances]
+def list_instances(compute, project, zone):
+  result = compute.instances().list(project=project, zone=zone).execute()
+  return result['items']
+# [END list_instances]
 
-  Args:
-    delete_method: The gce.Gce method for deleting the resource.
-  """
 
-  resource_name = args[0]
-  logging.info('Deleting %s' % resource_name)
+# [START create_instance]
+def create_instance(compute, project, zone, name):
+  sourceImage = "projects/debian-cloud/global/images/debian-7-wheezy-v20150320"
 
-  try:
-    delete_method(*args)
-  except (gce.ApiError, gce.ApiOperationError, ValueError) as e:
-    logging.error(DELETE_ERROR, {'name': resource_name})
-    logging.error(e)
+  config = {
+    'name': name,
+    'machineType': 'zones/%s/machineTypes/n1-standard-1' % zone,
+
+    # Specify the boot disk and the image to use as a source.
+    'disks': [
+      {
+        'boot': True,
+        'autoDelete': True,
+        'initializeParams': {
+          'sourceImage': sourceImage,
+        }
+      }
+    ],
+
+    # Specify a network interface with NAT to access the public
+    # internet.
+    'networkInterfaces': [{
+      'network': 'global/networks/default',
+      'accessConfigs': [
+        {'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}
+      ]
+    }],
+
+    # Allow the instance to access cloud storage and logging.
+    'serviceAccounts': [{
+      'email': 'default',
+      'scopes': [
+        'https://www.googleapis.com/auth/devstorage.read_write',
+        'https://www.googleapis.com/auth/logging.write'
+      ]
+    }],
+
+    # Metadata is readable from the instance and allows you to
+    # pass configuration from deployment scripts to instances.
+    'metadata': {
+      'items': [{
+        # Startup script is automatically executed by the
+        # instance upon startup.
+        'key': 'startup-script',
+        'value': open('startup-script.sh', 'r').read()
+      }, {
+        'key': 'url',
+        'value': 'http://storage.googleapis.com/gce-demo-input/photo.jpg'
+      }, {
+        'key': 'text',
+        'value': 'Ready for dessert?'
+      }, {
+        # Every project has a default Cloud Storage bucket that's
+        # the same name as the project.
+        'key': 'bucket',
+        'value': project
+      }]
+    }
+  }
+
+  return compute.instances().insert(
+    project=project,
+    zone=zone,
+    body=config).execute()
+# [END create_instance]
+
+
+# [START delete_instance]
+def delete_instance(compute, project, zone, name):
+  return compute.instances().delete(
+    project=project,
+    zone=zone,
+    instance=name).execute()
+# [END delete_instance]
+
+
+# [START wait_for_operation]
+def wait_for_operation(compute, project, zone, operation):
+  sys.stdout.write('Waiting for operation to finish')
+  while True:
+    result = compute.zoneOperations().get(project=project, zone=zone, operation=operation).execute()
+    if result['status'] == 'DONE':
+      print "done."
+      if 'error' in result:
+        raise Exception(result['error'])
+      return result
+    else:
+      sys.stdout.write('.')
+      sys.stdout.flush()
+      time.sleep(1)
+# [END wait_for_operation]
+
+
+# [START run]
+def run(project, zone, instance_name):
+  credentials = GoogleCredentials.get_application_default()
+  compute = build('compute', 'v1', credentials=credentials)
+
+  print 'Creating instance.'
+
+  operation = create_instance(compute, project, zone, instance_name)
+  wait_for_operation(compute, project, zone, operation['name'])
+
+  instances = list_instances(compute, project, zone)
+
+  print 'Instances in project %s and zone %s:' % (project, zone)
+  for instance in instances:
+    print ' - ' + instance['name']
+
+  print 'Instance created. It will take a minute or two for the instance to complete work.'
+  print 'Check this URL: http://storage.googleapis.com/%s/output.png' % project
+  print 'Once the image is uploaded press enter to delete the instance.'
+  raw_input()
+
+  print 'Deleting instance.'
+
+  operation = delete_instance(compute, project, zone, instance_name)
+  wait_for_operation(compute, project, zone, operation['name'])
+# [END run]
 
 
 def main():
-  """Perform OAuth 2 authorization, then start, list, and stop instance(s)."""
+  project = raw_input('What is your project ID? ')
+  zone = raw_input('What zone would you like to use? [us-central1-f] ') or 'us-central1-f'
+  instance_name = 'demo-instance'
+  run(project, zone, instance_name)
 
-  logging.basicConfig(level=logging.INFO)
-
-  # Load the settings for this sample app.
-  settings = json.loads(open(gce.SETTINGS_FILE, 'r').read())
-
-  # Perform OAuth 2.0 authorization flow.
-  flow = flow_from_clientsecrets(
-      settings['client_secrets'], scope=settings['compute_scope'])
-  storage = Storage(settings['oauth_storage'])
-  credentials = storage.get()
-
-  # Authorize an instance of httplib2.Http.
-  if credentials is None or credentials.invalid:
-    credentials = run(flow, storage)
-  http = httplib2.Http()
-  auth_http = credentials.authorize(http)
-
-  # Retrieve user input.
-  image_url = raw_input(
-      'Enter the URL of an image [Defaults to %s]: ' % IMAGE_URL)
-  if not image_url:
-    image_url = IMAGE_URL
-  image_text = raw_input(
-      'Enter text to add to the image [Defaults to "%s"]: ' % IMAGE_TEXT)
-  if not image_text:
-    image_text = IMAGE_TEXT
-  bucket = raw_input('Enter a Cloud Storage bucket [Required]: ')
-  if not bucket:
-    logging.error('Cloud Storage bucket required.')
-    return
-
-  # Initialize gce.Gce.
-  gce_helper = gce.Gce(auth_http, project_id=settings['project'])
-
-  # Create a Persistent Disk (PD), which is used as a boot disk.
-  try:
-    gce_helper.create_disk(DISK_NAME)
-  except (gce.ApiError, gce.ApiOperationError, ValueError, Exception) as e:
-    logging.error(INSERT_ERROR, {'name': DISK_NAME})
-    logging.error(e)
-    return
-
-  # Start an instance with a local start-up script and boot disk.
-  logging.info('Starting GCE instance')
-  try:
-    gce_helper.start_instance(
-        INSTANCE_NAME,
-        DISK_NAME,
-        service_email=settings['compute']['service_email'],
-        scopes=settings['compute']['scopes'],
-        startup_script='startup.sh',
-        metadata=[
-            {'key': 'url', 'value': image_url},
-            {'key': 'text', 'value': image_text},
-            {'key': 'cs-bucket', 'value': bucket}])
-  except (gce.ApiError, gce.ApiOperationError, ValueError, Exception) as e:
-    # Delete the disk in case the instance fails to start.
-    delete_resource(gce_helper.delete_disk, DISK_NAME)
-    logging.error(INSERT_ERROR, {'name': INSTANCE_NAME})
-    logging.error(e)
-    return
-  except gce.DiskDoesNotExistError as e:
-    logging.error(INSERT_ERROR, {'name': INSTANCE_NAME})
-    logging.error(e)
-    return
-
-  # List all running instances.
-  logging.info('These are your running instances:')
-  instances = gce_helper.list_instances()
-  for instance in instances:
-    logging.info(instance['name'])
-
-  logging.info(
-      'Visit http://storage.googleapis.com/%s/output.png.' % bucket)
-  logging.info('It might take a minute for the output.png file to show up.')
-  raw_input('Hit Enter when done to shutdown instance.')
-
-  # Stop the instance.
-  delete_resource(gce_helper.stop_instance, INSTANCE_NAME)
-
-  # Delete the disk.
-  delete_resource(gce_helper.delete_disk, DISK_NAME)
-
-  logging.info('Remember to delete the output.png file in ' + bucket)
 
 if __name__ == '__main__':
   main()

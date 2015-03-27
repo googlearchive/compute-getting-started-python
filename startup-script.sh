@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# [START startup_script]
+apt-get update
 apt-get -y install imagemagick
+
+# Use the metadata server to get the configuration specified during
+# instance creation. Read more about metadata here:
+# https://cloud.google.com/compute/docs/metadata#querying
 IMAGE_URL=$(curl http://metadata/computeMetadata/v1/instance/attributes/url -H "X-Google-Metadata-Request: True")
 TEXT=$(curl http://metadata/computeMetadata/v1/instance/attributes/text -H "X-Google-Metadata-Request: True")
-CS_BUCKET=$(curl http://metadata/computeMetadata/v1/instance/attributes/cs-bucket -H "X-Google-Metadata-Request: True")
+CS_BUCKET=$(curl http://metadata/computeMetadata/v1/instance/attributes/bucket -H "X-Google-Metadata-Request: True")
+
 mkdir image-output
 cd image-output
 wget $IMAGE_URL
-convert * -pointsize 50 -fill white -annotate +20+60 "$TEXT" output.png
+convert * -pointsize 30 -fill white -stroke black -gravity center -annotate +10+40 "$TEXT" output.png
+
+# Store the image in Google Cloud Storage and allow all users
+# to read it.
 gsutil cp -a public-read output.png gs://$CS_BUCKET/output.png
+
+# [END startup_script]
