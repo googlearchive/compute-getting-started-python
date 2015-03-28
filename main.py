@@ -34,11 +34,16 @@ def list_instances(compute, project, zone):
 
 # [START create_instance]
 def create_instance(compute, project, zone, name):
-    sourceImage = "projects/debian-cloud/global/images/debian-7-wheezy-v20150320"
+    source_disk_image = \
+        "projects/debian-cloud/global/images/debian-7-wheezy-v20150320"
+    machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
+    startup_script = open('startup-script.sh', 'r').read()
+    image_url = "http://storage.googleapis.com/gce-demo-input/photo.jpg"
+    image_caption = "Ready for dessert?"
 
     config = {
         'name': name,
-        'machineType': 'zones/%s/machineTypes/n1-standard-1' % zone,
+        'machineType': machine_type,
 
         # Specify the boot disk and the image to use as a source.
         'disks': [
@@ -46,7 +51,7 @@ def create_instance(compute, project, zone, name):
                 'boot': True,
                 'autoDelete': True,
                 'initializeParams': {
-                    'sourceImage': sourceImage,
+                    'sourceImage': source_disk_image,
                 }
             }
         ],
@@ -76,13 +81,13 @@ def create_instance(compute, project, zone, name):
                 # Startup script is automatically executed by the
                 # instance upon startup.
                 'key': 'startup-script',
-                'value': open('startup-script.sh', 'r').read()
+                'value': startup_script
             }, {
                 'key': 'url',
-                'value': 'http://storage.googleapis.com/gce-demo-input/photo.jpg'
+                'value': image_url
             }, {
                 'key': 'text',
-                'value': 'Ready for dessert?'
+                'value': image_caption
             }, {
                 # Every project has a default Cloud Storage bucket that's
                 # the same name as the project.
@@ -145,9 +150,13 @@ def run(project, zone, instance_name):
     for instance in instances:
         print ' - ' + instance['name']
 
-    print 'Instance created. It will take a minute or two for the instance to complete work.'
-    print 'Check this URL: http://storage.googleapis.com/%s/output.png' % project
-    print 'Once the image is uploaded press enter to delete the instance.'
+    print """
+Instance created.
+It will take a minute or two for the instance to complete work.
+Check this URL: http://storage.googleapis.com/%s/output.png
+Once the image is uploaded press enter to delete the instance.
+""" % project
+
     raw_input()
 
     print 'Deleting instance.'
@@ -159,7 +168,8 @@ def run(project, zone, instance_name):
 
 def main():
     project = raw_input('What is your project ID? ')
-    zone = raw_input('What zone would you like to use? [us-central1-f] ') or 'us-central1-f'
+    zone = raw_input(
+        'What zone would you like to use? [us-central1-f] ') or 'us-central1-f'
     instance_name = 'demo-instance'
     run(project, zone, instance_name)
 
