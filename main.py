@@ -23,7 +23,7 @@ import time
 
 from oauth2client.client import GoogleCredentials
 from googleapiclient.discovery import build
-
+from six.moves import input
 
 # [START list_instances]
 def list_instances(compute, project, zone):
