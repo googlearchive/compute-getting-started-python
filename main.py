@@ -23,7 +23,7 @@ import time
 
 from oauth2client.client import GoogleCredentials
 from googleapiclient.discovery import build
-
+from six.moves import input
 
 # [START list_instances]
 def list_instances(compute, project, zone):
@@ -123,7 +123,7 @@ def wait_for_operation(compute, project, zone, operation):
             operation=operation).execute()
 
         if result['status'] == 'DONE':
-            print "done."
+            print("done.")
             if 'error' in result:
                 raise Exception(result['error'])
             return result
@@ -139,27 +139,27 @@ def run(project, zone, instance_name):
     credentials = GoogleCredentials.get_application_default()
     compute = build('compute', 'v1', credentials=credentials)
 
-    print 'Creating instance.'
+    print('Creating instance.')
 
     operation = create_instance(compute, project, zone, instance_name)
     wait_for_operation(compute, project, zone, operation['name'])
 
     instances = list_instances(compute, project, zone)
 
-    print 'Instances in project %s and zone %s:' % (project, zone)
+    print('Instances in project %s and zone %s:' % (project, zone))
     for instance in instances:
-        print ' - ' + instance['name']
+        print(' - ' + instance['name'])
 
-    print """
+    print("""
 Instance created.
 It will take a minute or two for the instance to complete work.
 Check this URL: http://storage.googleapis.com/%s/output.png
 Once the image is uploaded press enter to delete the instance.
-""" % project
+""" % project)
 
-    raw_input()
+    input()
 
-    print 'Deleting instance.'
+    print('Deleting instance.')
 
     operation = delete_instance(compute, project, zone, instance_name)
     wait_for_operation(compute, project, zone, operation['name'])
@@ -167,8 +167,8 @@ Once the image is uploaded press enter to delete the instance.
 
 
 def main():
-    project = raw_input('What is your project ID? ')
-    zone = raw_input(
+    project = input('What is your project ID? ')
+    zone = input(
         'What zone would you like to use? [us-central1-f] ') or 'us-central1-f'
     instance_name = 'demo-instance'
     run(project, zone, instance_name)
