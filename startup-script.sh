@@ -29,7 +29,10 @@ cd image-output
 wget $IMAGE_URL
 convert * -pointsize 30 -fill white -stroke black -gravity center -annotate +10+40 "$TEXT" output.png
 
-# Store the image in Google Cloud Storage and allow all users
+# Create a Google Cloud Storage bucket.
+gsutil mb gs://$CS_BUCKET
+
+# Store the image in the Google Cloud Storage bucket and allow all users
 # to read it.
 gsutil cp -a public-read output.png gs://$CS_BUCKET/output.png
 
