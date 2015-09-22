@@ -1,3 +1,9 @@
+![status: inactive](https://img.shields.io/badge/status-inactive-red.svg)
+
+This project is no longer actively developed or maintained.  
+
+This sample has been moved to [GoogleCloudPlatform/python-docs-samples](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/compute).
+
 # Getting Started with Compute Engine and the Google Python Client Library
 
 [Google Compute Engine](https://cloud.google.com/compute/) features a [RESTful API](https://cloud.google.com/compute/docs/api/getting-started)
